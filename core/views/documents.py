@@ -61,7 +61,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
             message = f"« {instance.label or instance.get_document_type_display()} » soumis pour validation"
             if owner_label:
                 message += f" ({owner_label})"
-            Notification.objects.create(recipient=validator, message=message[:255], contact=instance.contact)
+            Notification.objects.create(
+                recipient=validator, message=message[:255], contact=instance.contact, urgency=Notification.Urgency.MEDIUM
+            )
 
     def _all_validators_approved(self, document):
         """Vrai si chaque validateur désigné a rendu VALIDE comme dernière
@@ -112,7 +114,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
             if document.uploaded_by:
                 message = f"Votre document « {document.label or document.get_document_type_display()} » a été {DECISION_LABELS[decision]}."
-                Notification.objects.create(recipient=document.uploaded_by, message=message[:255], contact=document.contact)
+                # Un rejet ou une demande de modification bloque l'auteur —
+                # ça mérite la bande d'alerte, pas juste la cloche.
+                urgency = (
+                    Notification.Urgency.HIGH if decision != DocumentReview.Decision.VALIDE else Notification.Urgency.LOW
+                )
+                Notification.objects.create(
+                    recipient=document.uploaded_by, message=message[:255], contact=document.contact, urgency=urgency
+                )
 
         return Response(DocumentSerializer(document, context={"request": request}).data)
 
@@ -139,7 +148,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
             message = f"« {document.label or document.get_document_type_display()} » renvoyé pour validation"
             if owner_label:
                 message += f" ({owner_label})"
-            Notification.objects.create(recipient=validator, message=message[:255], contact=document.contact)
+            Notification.objects.create(
+                recipient=validator, message=message[:255], contact=document.contact, urgency=Notification.Urgency.MEDIUM
+            )
 
         return Response(DocumentSerializer(document, context={"request": request}).data)
 

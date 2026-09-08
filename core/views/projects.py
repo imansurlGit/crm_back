@@ -167,4 +167,4 @@ class PrestationViewSet(viewsets.ModelViewSet):
         )
         if note:
             message += f" Note : {note}"
-        Notification.objects.create(recipient=chief, message=message[:255])
+        Notification.objects.create(recipient=chief, message=message[:255], urgency=Notification.Urgency.MEDIUM)

@@ -387,11 +387,12 @@ class EventSerializer(serializers.ModelSerializer):
 
 class NotificationSerializer(serializers.ModelSerializer):
     contact_name = serializers.SerializerMethodField()
+    urgency_display = serializers.CharField(source="get_urgency_display", read_only=True)
 
     class Meta:
         model = Notification
-        fields = ["id", "message", "contact", "contact_name", "is_read", "created_at"]
-        read_only_fields = ["id", "message", "contact", "contact_name", "created_at"]
+        fields = ["id", "message", "contact", "contact_name", "urgency", "urgency_display", "is_read", "created_at"]
+        read_only_fields = ["id", "message", "contact", "contact_name", "urgency", "urgency_display", "created_at"]
 
     def get_contact_name(self, obj):
         return (obj.contact.company or obj.contact.name) if obj.contact else None

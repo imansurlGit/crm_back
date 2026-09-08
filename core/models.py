@@ -779,6 +779,10 @@ class Notification(models.Model):
     prospect) — alimente le badge cloche de la topbar. Générée uniquement
     côté serveur, jamais créée directement via l'API."""
 
+    # Alias pratique — évite d'importer Project juste pour son enum dans les
+    # vues qui créent des notifications (même pattern que User.Role = Role).
+    Urgency = Project.Priority
+
     recipient = models.ForeignKey(
         User, verbose_name="destinataire", related_name="notifications", on_delete=models.CASCADE
     )
@@ -790,6 +794,12 @@ class Notification(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
+    )
+    # Réutilise l'échelle de priorité de Project (même sémantique que
+    # Task.priority) — LOW reste dans la cloche uniquement ; MEDIUM/HIGH
+    # s'affichent aussi en bande sous l'en-tête (jaune / rouge côté frontend).
+    urgency = models.CharField(
+        "urgence", max_length=10, choices=Project.Priority.choices, default=Project.Priority.LOW
     )
     is_read = models.BooleanField("lue", default=False)
     created_at = models.DateTimeField("créée le", auto_now_add=True)

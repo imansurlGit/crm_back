@@ -48,6 +48,7 @@ class PartnershipDossierViewSet(viewsets.ModelViewSet):
                 Notification.objects.create(
                     recipient=dossier.head_marketing,
                     message=f"Le dossier partenariat « {dossier.reference} » vous a été transmis."[:255],
+                    urgency=Notification.Urgency.MEDIUM,
                 )
         elif from_step == Step.TRANSMISSION:
             PartnershipTimelineEntry.objects.create(
