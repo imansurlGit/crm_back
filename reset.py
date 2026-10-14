@@ -45,42 +45,39 @@ TRANSACTIONAL_MODELS = [
     Event, Task, Note, Interaction, Prestation, Project, Contact,
 ]
 
-DIVISIONS = ['Ventes', 'Marketing', 'Numérique', 'Visibilité, Infrastructure et Production', 'Comptabilité']
+DIVISIONS = ['Ventes', 'Marketing', 'Numérique', 'Visibilité, Infrastructure et Production', 'Comptabilité', 'Direction Générale']
 
 # Titulaires des rôles uniques — recréés seulement s'ils manquent (base neuve).
 UNIQUE_ROLE_SEEDS = [
-    dict(email='dg@iman.ne', first_name='Dark', last_name='Vador', role='DG', division=None),
-    dict(email='adch@iman.ne', first_name='Videl', last_name='Sat', role='ADCH', division=None),
-    dict(email='cdv@iman.ne', first_name='Bulma', last_name='Brief', role='CDV', division='Ventes'),
-    dict(email='cdm@iman.ne', first_name='Claire', last_name='Anthony', role='CDM', division='Marketing'),
-    dict(email='cdn@iman.ne', first_name='Steve', last_name='Jobs', role='CDN', division='Numérique'),
-    dict(email='vip@iman.ne', first_name='Billi', last_name='Bolt', role='VIP', division='Visibilité, Infrastructure et Production'),
-    dict(email='cg@iman.ne', first_name='New', last_name='Comptable', role='COMPTABLE_GENERAL', division='Comptabilité'),
-    dict(email='rdw@iman.ne', first_name='Bill', last_name='Gates', role='RDW', division='Numérique'),
+    dict(email='dg@iman.ne', first_name='Bello', last_name='Aboubacar', role='DG', division='Direction Générale'),
+    dict(email='ad@iman.ne', first_name='Rébecca', last_name='', role='ADCH', division='Direction Générale'),
+    dict(email='cdv@iman.ne', first_name='Aida', last_name='', role='CDV', division='Ventes'),
+    dict(email='cdn@iman.ne', first_name='Ismael', last_name='Issaka', role='CDN', division='Numérique'),
+    dict(email='rdw@iman.ne', first_name='Anouar', last_name='Sidi', role='RDW', division='Numérique'),
+    dict(email='rsi@iman.ne', first_name='A.Nasser', last_name='Zossou', role='RSI', division='Numérique'),
+    dict(email='compta@iman.ne', first_name='Salamatou', last_name='', role='COMPTABLE_GENERAL', division='Comptabilité'),
 ]
 
 # Rôles "en équipe" — complétés jusqu'au quota ci-dessous pour une démo qui a
 # assez de monde à qui distribuer les prestations/tâches.
+# NB : CDM, VIP et ASSISTANT_COMPTABLE n'ont pas (encore) de titulaire réel —
+# ces rôles restent vacants dans la démo, comme le gère déjà
+# `_notify_division_chief_if_newly_assigned` côté views (pas de notification
+# envoyée si personne n'occupe le rôle).
 TEAM_ROLE_TARGETS = {
     'COMMERCIAL': [
-        dict(email='v1@iman.ne', first_name='Franklin', last_name='Roosevelt'),
-        dict(email='v2@iman.ne', first_name='Rose', last_name='Marie'),
-        dict(email='v3@iman.ne', first_name='Aïssa', last_name='Boukari'),
-        dict(email='v4@iman.ne', first_name='Karim', last_name='Ousmane'),
+        dict(email='rcb@iman.ne', first_name='Absatou', last_name=''),
     ],
     'DEVELOPPEUR': [
         dict(email='dev2@iman.ne', first_name='Alker', last_name='Soumana'),
         dict(email='dev3@iman.ne', first_name='Amina', last_name='Tinaou'),
     ],
     'GRAPHISTE': [
-        dict(email='g1@iman.ne', first_name='Krilin', last_name='Ball'),
-        dict(email='g2@iman.ne', first_name='Nafissa', last_name='Elh'),
+        dict(email='g1@iman.ne', first_name='Mohammed', last_name=''),
+        dict(email='g2@iman.ne', first_name='Yahouza', last_name=''),
     ],
     'CHARGE_PARTENARIAT': [
-        dict(email='spi@iman.ne', first_name='Lorie', last_name='Chen'),
-    ],
-    'ASSISTANT_COMPTABLE': [
-        dict(email='ac1@iman.ne', first_name='Oumou', last_name='Sidibe'),
+        dict(email='spi@iman.ne', first_name='Samira', last_name=''),
     ],
 }
 TEAM_DIVISION_BY_ROLE = {
@@ -88,7 +85,6 @@ TEAM_DIVISION_BY_ROLE = {
     'DEVELOPPEUR': 'Numérique',
     'GRAPHISTE': 'Marketing',
     'CHARGE_PARTENARIAT': 'Marketing',
-    'ASSISTANT_COMPTABLE': 'Comptabilité',
 }
 
 PARTENAIRES = [
@@ -183,16 +179,43 @@ def ensure_divisions():
     return divisions
 
 
+def remove_obsolete_demo_users():
+    """Retire les comptes de démo issus d'anciennes versions de ce script qui
+    ne correspondent plus à aucune entrée de UNIQUE_ROLE_SEEDS / TEAM_ROLE_TARGETS
+    (ex: anciens titulaires fictifs de CDM/VIP/ASSISTANT_COMPTABLE, commerciaux
+    v1-v4 remplacés par rcb). Sans ça, ces comptes restent orphelins pour
+    toujours puisque `ensure_unique_role_holders`/`ensure_team` ne font que
+    créer ou mettre à jour, jamais supprimer."""
+    valid_emails = {seed['email'] for seed in UNIQUE_ROLE_SEEDS}
+    valid_emails |= {seed['email'] for seeds in TEAM_ROLE_TARGETS.values() for seed in seeds}
+    stale = User.objects.filter(email__iendswith='@iman.ne').exclude(email__in=valid_emails)
+    count = stale.count()
+    if count:
+        print(f'\nComptes de démo obsolètes supprimés : {count}')
+        for user in stale:
+            print(f'  {user.email} ({user.get_full_name() or user.email})')
+        stale.delete()
+
+
 def ensure_unique_role_holders(divisions):
     for seed in UNIQUE_ROLE_SEEDS:
-        if User.objects.filter(role=seed['role']).exists():
-            continue
-        User.objects.create_user(
-            email=seed['email'], password=DEMO_PASSWORD, first_name=seed['first_name'],
-            last_name=seed['last_name'], role=seed['role'],
-            division=divisions.get(seed['division']) if seed['division'] else None,
-        )
-        print(f"  Créé : {seed['first_name']} {seed['last_name']} ({seed['role']})")
+        division = divisions.get(seed['division']) if seed['division'] else None
+        user = User.objects.filter(role=seed['role']).first()
+        if user is None:
+            User.objects.create_user(
+                email=seed['email'], password=DEMO_PASSWORD, first_name=seed['first_name'],
+                last_name=seed['last_name'], role=seed['role'], division=division,
+            )
+            print(f"  Créé : {seed['first_name']} {seed['last_name']} ({seed['role']})")
+        elif (user.email, user.first_name, user.last_name, user.division_id) != (
+            seed['email'], seed['first_name'], seed['last_name'], division.id if division else None
+        ):
+            user.email = seed['email']
+            user.first_name = seed['first_name']
+            user.last_name = seed['last_name']
+            user.division = division
+            user.save(update_fields=['email', 'first_name', 'last_name', 'division'])
+            print(f"  Mis à jour : {seed['first_name']} {seed['last_name']} ({seed['role']})")
 
 
 def ensure_team(divisions):
@@ -207,10 +230,13 @@ def ensure_team(divisions):
                 user.set_password(DEMO_PASSWORD)
                 user.save(update_fields=['password'])
                 print(f"  Créé : {seed['first_name']} {seed['last_name']} ({role})")
-            elif user.role != role or user.division_id != division.id:
+            elif (user.first_name, user.last_name, user.role, user.division_id) != (seed['first_name'], seed['last_name'], role, division.id):
+                user.first_name = seed['first_name']
+                user.last_name = seed['last_name']
                 user.role = role
                 user.division = division
-                user.save(update_fields=['role', 'division'])
+                user.save(update_fields=['first_name', 'last_name', 'role', 'division'])
+                print(f"  Mis à jour : {seed['first_name']} {seed['last_name']} ({role})")
 
 
 # ---------------------------------------------------------------------------
@@ -367,7 +393,8 @@ def assign_prestation(project, division, label, commercial, chief, note, deadlin
     brief.file = placeholder_file('brief.txt', f'Consignes pour {label} : {note}')
     brief.save(update_fields=['file'])
     DocumentVersion.objects.create(document=brief, file=brief.file, uploaded_by=commercial)
-    Notification.objects.create(recipient=chief, message=f'La prestation « {label} » du projet « {project.name} » a été affectée à votre division.'[:255])
+    if chief:
+        Notification.objects.create(recipient=chief, message=f'La prestation « {label} » du projet « {project.name} » a été affectée à votre division.'[:255])
     return prestation
 
 
@@ -391,8 +418,10 @@ def record_payments(project, comptable, schedule):
 
 
 def seed_clients(pool, commercials, chiefs, divisions):
-    """chiefs: dict role->User (cdm, cdn, vip). Retourne les statuts couverts,
-    du tout début de production jusqu'à la clôture complète."""
+    """chiefs: dict role->User (seul 'CDN' est garanti ; CDM/VIP sont des
+    rôles vacants dans la démo, `assign_prestation` gère leur absence).
+    Retourne les statuts couverts, du tout début de production jusqu'à la
+    clôture complète."""
     print('\nClients (projet complet) :')
     developers = list(User.objects.filter(role='DEVELOPPEUR'))
     graphistes = list(User.objects.filter(role='GRAPHISTE'))
@@ -555,6 +584,7 @@ def seed_today_agenda(contacts, commercials):
 # ---------------------------------------------------------------------------
 def main():
     wipe_transactional_data()
+    remove_obsolete_demo_users()
     divisions = ensure_divisions()
     ensure_unique_role_holders(divisions)
     ensure_team(divisions)
@@ -563,12 +593,10 @@ def main():
     if not commercials:
         raise SystemExit('Aucun commercial disponible — vérifiez ensure_team().')
     chiefs = {
-        'CDM': User.objects.filter(role='CDM').first(),
         'CDN': User.objects.filter(role='CDN').first(),
-        'VIP': User.objects.filter(role='VIP').first(),
     }
     cdv = User.objects.filter(role='CDV').first()
-    cdm = chiefs.get('CDM')
+    cdm = chiefs.get('CDM')  # toujours None : rôle vacant pour l'instant
 
     pool = list(COMPANY_POOL)
     random.shuffle(pool)

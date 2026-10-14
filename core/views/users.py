@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -23,7 +24,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return UserSerializer
 
     def get_permissions(self):
-        if self.action in ("me", "change_password", "commercials", "by_division", "directory"):
+        if self.action in ("me", "change_password", "commercials", "by_division", "directory", "heartbeat"):
             return [IsAuthenticated()]
         return [CanManageUsers()]
 
@@ -39,6 +40,14 @@ class UserViewSet(viewsets.ModelViewSet):
 
         serializer = UserSerializer(request.user, context={"request": request})
         return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="heartbeat")
+    def heartbeat(self, request):
+        """Signal périodique envoyé par le frontend tant que l'app est ouverte
+        et visible — alimente `last_seen_at`, utilisé pour calculer un statut
+        « en ligne » en temps réel (voir AdchComptesPage)."""
+        User.objects.filter(pk=request.user.pk).update(last_seen_at=timezone.now())
+        return Response({"detail": "ok"})
 
     @action(detail=False, methods=["post"], url_path="change-password")
     def change_password(self, request):

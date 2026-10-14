@@ -46,12 +46,13 @@ class UserSerializer(serializers.ModelSerializer):
             "is_staff",
             "date_joined",
             "last_login",
+            "last_seen_at",
         ]
         # `is_active` est en lecture seule : avec multipart/form-data (requis pour
         # l'upload de photo), un BooleanField absent est interprété par DRF comme
         # une case décochée (False), ce qui désactiverait le compte à chaque
         # création/édition si le champ était modifiable ici.
-        read_only_fields = ["id", "is_staff", "is_active", "date_joined", "last_login"]
+        read_only_fields = ["id", "is_staff", "is_active", "date_joined", "last_login", "last_seen_at"]
 
     def get_division_name(self, obj):
         return obj.division.name if obj.division else None

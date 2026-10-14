@@ -85,6 +85,11 @@ class User(AbstractUser):
         null=True,
         blank=True,
     )
+    # Rafraîchi par un heartbeat périodique envoyé par le frontend tant que
+    # l'app est ouverte (voir UserViewSet.heartbeat) — sert à calculer un
+    # statut « en ligne » en temps réel, distinct de `last_login` qui ne
+    # capture que l'instant de connexion.
+    last_seen_at = models.DateTimeField("vu(e) pour la dernière fois", null=True, blank=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
